@@ -9,7 +9,7 @@ This is a simple Battlesnake server written in Python.
 For instructions see
 https://github.com/BattlesnakeOfficial/starter-snake-python/README.md
 """
-
+'If killing then it overrides the trapping prevention thingy'
 
 class Battlesnake(object):
     @cherrypy.expose
@@ -302,7 +302,7 @@ class Battlesnake(object):
             }
 
             for coord in adj_coords:
-                if self.isValidMove(data, coord, True) and coord not in seen_set:
+                if self.isValidMove(data, coord, False) and coord not in seen_set:
                     seen_set.add(coord)
                     if len(seen_set) >= max_node_cnt:
                         return True
