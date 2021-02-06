@@ -86,7 +86,12 @@ class Battlesnake(object):
             for part in snake["body"]:
                 invalid_coords.add((part["x"],part["y"]))
 
-        adjacent_coords = {("right",(head["x"]+1, head["y"])), ("left", ( head["x"]-1,head["y"])), ("up",( head["x"], head["y"]+1)), ("down", (head["x"], head["y"]-1))}
+        adjacent_coords = {
+            ("right",(head["x"]+1, head["y"])), 
+            ("left", ( head["x"]-1,head["y"])), 
+            ("up",( head["x"], head["y"]+1)), 
+            ("down", (head["x"], head["y"]-1))
+        }
 
         #print(f"head coords {head['x']}, {head['y']}")
         #print(f"adjacent_coords: {adjacent_coords}")
@@ -103,20 +108,6 @@ class Battlesnake(object):
 
         possible_moves = self.headbutt_check(data, possible_moves, head, other_heads)
         return possible_moves
-
-
-    def will_headbutt(self, data, coord):
-
-        pot_headbutt_coords = {(("right"),(our_head["x"]+2, our_head["y"])), (("left"), (our_head["x"]-2, our_head["y"])), (("up"),( our_head["x"], our_head["y"]+2)), (("down"), (our_head["x"], our_head["y"]-2)), (("up", "right"),(our_head["x"]+1, our_head["y"]+1)), (("up","left"),(our_head["x"]-1, our_head["y"]+1)), (("down","left"),(our_head["x"]-1, our_head["y"]-1)), (("down","right"),(our_head["x"]+1, our_head["y"]-1))}
-
-        other_heads = []
-
-        snake_lst = filter(lambda x: , data["board"]["snakes"])
-
-        for snake in data["board"]["snakes"]:
-            if snake["head"] != head:
-                other_heads.append(snake["head"])
-        
 
 
 
