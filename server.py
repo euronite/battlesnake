@@ -32,6 +32,8 @@ class Battlesnake(object):
         # This function is called everytime your snake is entered into a game.
         # cherrypy.request.json contains information about the game that's about to be played.
         data = cherrypy.request.json
+        self.length = data["you"]["length"]
+        self.prev_length = 0
 
         print("START")
         return "ok"
@@ -46,9 +48,18 @@ class Battlesnake(object):
         snake_id = data["you"]["id"]
 
         possible_moves = self.get_valid_moves(data)
-        print(possible_moves)
 
         move = "up" #Default choice
+
+        temp_lst = []
+        for dir, coord in possible_moves:
+            if self.wont_get_trapped(data, coord):
+                print(f"coord we're deciding on is: {coord}")
+                temp_lst.append((dir, coord))
+
+        if len(temp_lst) != 0:
+            possible_moves = temp_lst
+
 
         if len(possible_moves) != 0:
             food_coord = self.getNearestFood(data)
@@ -58,7 +69,8 @@ class Battlesnake(object):
             else:
                 move = random.choice(possible_moves)[0]
 
-
+        self.prev_length = self.length
+        self.length = data["you"]["length"]
         return {"move": move}
 
     @cherrypy.expose
@@ -123,12 +135,16 @@ class Battlesnake(object):
         height = data["board"]["height"]
         width = data["board"]["width"]
 
+        tail = (data["you"]["body"][-1]["x"],data["you"]["body"][-1]["y"])
+
         invalid_coords = set()
         for snake in data["board"]["snakes"]:
             snake_body_parts = snake["body"] 
             for part in snake_body_parts:
                 invalid_coords.add((part["x"],part["y"]))
                 
+        if tail in invalid_coords and self.prev_length == self.length:
+            invalid_coords.remove(tail)
 
         in_bounds = coord[0] < width and coord[1] < height and coord[0] >= 0 and coord[1] >= 0
         is_empty_space = coord not in invalid_coords
@@ -136,9 +152,7 @@ class Battlesnake(object):
         our_snake_id = data["you"]["id"]
         wont_headbutt = not self.going_to_headbutt(data, coord, our_snake_id) if count_headbutt else True
 
-        #if not count_headbutt:
-        #    print(f"invalid coord list: {invalid_coords}")
-        #    print(f"curr coord: {coord}")
+
 
 
         return in_bounds and is_empty_space and wont_headbutt 
@@ -249,26 +263,52 @@ class Battlesnake(object):
             
 
     def distance_checker(self, data, dest_coords):
-        adjacent_coords = {
-            ("right", (dest_coords[0]+1, dest_coords[1])), 
-            ("left", ( dest_coords[0]-1, dest_coords[1])), 
-            ("up",( dest_coords[0], dest_coords[1]+1)), 
-            ("down", (dest_coords[0], dest_coords[1]-1))
-        }
 
+        adjacent_coords = {
+            (dest_coords[0]+1, dest_coords[1]), 
+             ( dest_coords[0]-1, dest_coords[1]), 
+            (dest_coords[0], dest_coords[1]+1), 
+             (dest_coords[0], dest_coords[1]-1)
+        }
+        
         counter = 0
-        for dir, coord in adjacent_coords:
+        for coord in adjacent_coords:
             if self.isValidMove(data, coord, False):
                 counter += 1
 
 
-        if counter > 0:
-            return True
-        else:
-            return False
-
+        return counter > 0
             
+            
+    def wont_get_trapped(self, data, coord):
 
+        max_node_cnt = 10
+
+
+        node_queue = collections.deque([coord])
+        seen_set = {coord}
+
+        while node_queue:
+
+            next_coord = node_queue.pop()
+
+            x, y  = next_coord
+
+            adj_coords = {
+                (x+1, y), 
+                (x-1,y), 
+                (x, y+1), 
+                (x, y-1)
+            }
+
+            for coord in adj_coords:
+                if self.isValidMove(data, coord, True) and coord not in seen_set:
+                    seen_set.add(coord)
+                    if len(seen_set) >= max_node_cnt:
+                        return True
+                    node_queue.appendleft(coord)
+
+        return False
 
 
 if __name__ == "__main__":
