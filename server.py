@@ -72,19 +72,8 @@ class Battlesnake(object):
 
         # TODO check if there's two snake heads one block apart, if bigger, valid move else abort.
         # TODO invlaid if colliding with other snake
-        height = data["board"]["height"]
-        width = data["board"]["width"]
 
         head = data["you"]["head"]
-        invalid_coords = set()
-
-        other_heads = []
-
-        for snake in data["board"]["snakes"]:
-            if snake["head"] != head:
-                other_heads.append(snake["head"])
-            for part in snake["body"]:
-                invalid_coords.add((part["x"],part["y"]))
 
         adjacent_coords = {
             ("right",(head["x"]+1, head["y"])), 
@@ -93,21 +82,59 @@ class Battlesnake(object):
             ("down", (head["x"], head["y"]-1))
         }
 
-        #print(f"head coords {head['x']}, {head['y']}")
-        #print(f"adjacent_coords: {adjacent_coords}")
+
         possible_moves = []
         for dir, coord in adjacent_coords:
+            if self.isValidMove(data, coord):
+                possible_moves.append(dir)
+
+
+        if len(possible_moves) == 0:
+            for dir, coord in adjacent_coords:
+                if not self.going_to_headbutt(data, coord, data["you"]["id"]):
+                    possible_moves.append(dir)
+                
+        return possible_moves
+
+
+    def isValidMove(self, data, coord):
+
+            height = data["board"]["height"]
+            width = data["board"]["width"]
+
+            invalid_coords = set()
+            for snake in data["board"]["snakes"]:
+                for part in snake["body"]:
+                    invalid_coords.add((part["x"],part["y"]))
+
 
             in_bounds = coord[0] < width and coord[1] < height and coord[0] >= 0 and coord[1] >= 0
             is_empty_space = coord not in invalid_coords
-            #will_not_headbut = not headbutt_check
 
-            if in_bounds and is_empty_space:
+            our_snake_id = data["you"]["id"]
+            wont_headbutt = not self.going_to_headbutt(data, coord, our_snake_id)
 
-                possible_moves.append(dir)
+            return in_bounds and is_empty_space and wont_headbutt
 
-        possible_moves = self.headbutt_check(data, possible_moves, head, other_heads)
-        return possible_moves
+
+    def going_to_headbutt(self, data, coord, our_snake_id):
+
+        adjacent_coords = {
+            (coord[0]+1, coord[1]), 
+            (coord[0]-1, coord[1]), 
+            (coord[0], coord[1]+1), 
+            (coord[0], coord[1]-1)
+        }
+
+
+        other_snake_lst = list(filter(lambda x: x["id"] != our_snake_id, data["board"]["snakes"]))
+        other_head_coords = set(map(lambda snake: (snake["head"]["x"], snake["head"]["y"]), other_snake_lst))
+
+        if len(adjacent_coords.intersection(other_head_coords)) == 0:
+            return False
+
+        return True
+
 
 
 
@@ -125,6 +152,10 @@ class Battlesnake(object):
 
         for dir_lst, coord in head_coords:
             for dir in dir_lst:
+                # if dir_lst > 1:
+                    #dir = random.choice(dir_lst)
+                #else
+                #   dir = dir_lst[0]
                 if coord in bad_head_coords and dir in possible_moves:
                     possible_moves.remove(dir)
                     print(f"headbutt direction {dir}")
