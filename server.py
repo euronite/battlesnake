@@ -1,11 +1,13 @@
 import os
 import random
+import json
 
 import cherrypy
 
 """
 This is a simple Battlesnake server written in Python.
-For instructions see https://github.com/BattlesnakeOfficial/starter-snake-python/README.md
+For instructions see
+https://github.com/BattlesnakeOfficial/starter-snake-python/README.md
 """
 
 
@@ -39,15 +41,18 @@ class Battlesnake(object):
     @cherrypy.tools.json_out()
     def move(self):
         # This function is called on every turn of a game. It's how your snake decides where to move.
-        # Valid moves are "up", "down", "left", or "right".
         # TODO: Use the information in cherrypy.request.json to decide your next move.
         data = cherrypy.request.json
+        snake_id = data["you"]["id"]
 
-        # Choose a random direction to move in
-        possible_moves = ["up", "down", "left", "right"]
-        move = random.choice(possible_moves)
+        possible_moves = {"up", "down", "left", "right"}
 
-        print(f"MOVE: {move}")
+        possible_moves = self.valid_move(data, possible_moves)
+
+        move = random.choice(list(possible_moves)) if len(possible_moves) else "up"
+        print(f"Chosen move: {move}")
+        print(f"Available moves: {possible_moves}")
+
         return {"move": move}
 
     @cherrypy.expose
@@ -60,6 +65,37 @@ class Battlesnake(object):
         print("END")
         return "ok"
 
+    def valid_move(self, data, possible_moves):
+        """
+        This is a valid move calculator.
+        """
+
+        # TODO check if there's two snake heads one block apart, if bigger, valid move else abort.
+        # TODO invlaid if colliding with other snake
+        height = data["board"]["height"]
+        width = data["board"]["width"]
+
+        head = data["you"]["head"]
+        invalid_coords = set()
+
+        for part in data["you"]["body"]:
+            invalid_coords.add((part["x"],part["y"]))
+
+        adjacent_coords = {("right",(head["x"]+1, head["y"])), ("left", ( head["x"]-1,head["y"])), ("up",( head["x"], head["y"]+1)), ("down", (head["x"], head["y"]-1))}
+
+        print(f"head coords {head['x']}, {head['y']}")
+        print(f"adjacent_coords: {adjacent_coords}")
+        possible_moves = []
+        for dir, coord in adjacent_coords:
+
+            in_bounds = coord[0] < width and coord[1] < height and coord[0] >= 0 and coord[1] >= 0
+            is_empty_space = coord not in invalid_coords
+
+            if in_bounds and is_empty_space:
+
+                possible_moves.append(dir)
+
+        return possible_moves
 
 if __name__ == "__main__":
     server = Battlesnake()
