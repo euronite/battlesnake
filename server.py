@@ -94,6 +94,8 @@ class Battlesnake(object):
 
         possible_moves = []
         for dir, coord in adjacent_coords:
+            if self.canKill(data, coord):
+                return [(dir, coord)]
             if self.isValidMove(data, coord):
                 possible_moves.append((dir, coord))
 
@@ -196,8 +198,29 @@ class Battlesnake(object):
 
         return None
 
+    def canKill(self, data, coord):
+        
+        our_snake_id = data["you"]["id"]
+        
+        adjacent_coords = {
+            (coord[0]+1, coord[1]), 
+            (coord[0]-1, coord[1]), 
+            (coord[0], coord[1]+1), 
+            (coord[0], coord[1]-1)
+        }
+        
+        other_snake_lst = list(filter(lambda x: x["id"] != our_snake_id, data["board"]["snakes"]))
+        other_head_coords = set(map(lambda snake: (snake["head"]["x"], snake["head"]["y"], snake["length"]), other_snake_lst))
 
+        for x, y, enemy_length in other_head_coords:
+            if (x,y) in adjacent_coords and self.isValidMove(data, (x,y)) and enemy_length < data["you"]["length"]:
+                return True
+        
+        return False
+            
 
+        
+            
 
 
 
