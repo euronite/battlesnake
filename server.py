@@ -1,7 +1,7 @@
 import os
 import random
 import json
-
+import collections
 import cherrypy
 
 """
@@ -40,18 +40,24 @@ class Battlesnake(object):
     @cherrypy.tools.json_in()
     @cherrypy.tools.json_out()
     def move(self):
-        # This function is called on every turn of a game. It's how your snake decides where to move.
-        # TODO: Use the information in cherrypy.request.json to decide your next move.
+
+
         data = cherrypy.request.json
         snake_id = data["you"]["id"]
 
-        possible_moves = {"up", "down", "left", "right"}
+        possible_moves = self.get_valid_moves(data)
 
-        possible_moves = self.get_valid_moves(data, possible_moves)
 
-        move = random.choice(list(possible_moves)) if len(possible_moves) else "up"
-        print(f"Chosen move: {move}")
-        print(f"Available moves: {possible_moves}")
+        move = "up" #Default choice
+
+        if len(possible_moves) != 0:
+            food_coord = self.getNearestFood(data)
+
+            if food_coord:
+                move = min(possible_moves, key=lambda p: abs(p[1][0]-food_coord[0])**2 + abs(p[1][1] - food_coord[1])**2)[0]
+            else:
+                move = random.choice(possible_moves)[0]
+
 
         return {"move": move}
 
@@ -65,13 +71,16 @@ class Battlesnake(object):
         print("END")
         return "ok"
 
-    def get_valid_moves(self, data, possible_moves):
+    def get_valid_moves(self, data):
         """
         This is a valid move calculator.
+
+
+        Output:
+
+        possible_moves: a tuple of the move direction and corresponding coordinate -> (dir, coord)
         """
 
-        # TODO check if there's two snake heads one block apart, if bigger, valid move else abort.
-        # TODO invlaid if colliding with other snake
 
         head = data["you"]["head"]
 
@@ -86,13 +95,13 @@ class Battlesnake(object):
         possible_moves = []
         for dir, coord in adjacent_coords:
             if self.isValidMove(data, coord):
-                possible_moves.append(dir)
+                possible_moves.append((dir, coord))
 
 
         if len(possible_moves) == 0:
             for dir, coord in adjacent_coords:
                 if self.going_to_headbutt(data, coord, data["you"]["id"]):
-                    possible_moves.append(dir)
+                    possible_moves.append((dir, coord))
                 
         return possible_moves
 
@@ -135,33 +144,62 @@ class Battlesnake(object):
 
         return True
 
+    def getNearestFood(self, data):
+        '''
+        Returns None if no food on board, otherwise returns the coords of the nearest food 
 
-
-
-    def headbutt_check(self, data, possible_moves, our_head, other_heads):
-        # Get other snek heads
-        # Check all sneks that are x +- 2 or y +- 2
-        # eliminate that direction from the valid moves
+        Input:
+        data: dict of json data
         
-        head_coords = {(("right"),(our_head["x"]+2, our_head["y"])), (("left"), (our_head["x"]-2, our_head["y"])), (("up"),( our_head["x"], our_head["y"]+2)), (("down"), (our_head["x"], our_head["y"]-2)), (("up", "right"),(our_head["x"]+1, our_head["y"]+1)), (("up","left"),(our_head["x"]-1, our_head["y"]+1)), (("down","left"),(our_head["x"]-1, our_head["y"]-1)), (("down","right"),(our_head["x"]+1, our_head["y"]-1))}
+        Output:
+        coord: tuple of coords, (x,y)
+        '''
 
-        #print(f"possible_moves before head check {possible_moves}")
-        bad_head_coords = []
-        for head in other_heads:
-            bad_head_coords.append((head["x"], head["y"]))
 
-        for dir_lst, coord in head_coords:
-            for dir in dir_lst:
-                # if dir_lst > 1:
-                    #dir = random.choice(dir_lst)
-                #else
-                #   dir = dir_lst[0]
-                if coord in bad_head_coords and dir in possible_moves:
-                    possible_moves.remove(dir)
-                    print(f"headbutt direction {dir}")
+        head = data["you"]["head"]
+        head_coord = (head["x"], head["y"])
+        food_coord_set = set(map(lambda coord_dict : (coord_dict["x"], coord_dict["y"]), data["board"]["food"]))
 
-        #print(f"possible_moves after head check {possible_moves}")
-        return possible_moves
+
+        result = self.BFS(head_coord, food_coord_set, data)
+
+        return result
+
+
+
+
+    def BFS(self, curr_coord, food_coord_set, data):
+
+        node_queue = collections.deque([curr_coord])
+        seen_set = {curr_coord}
+
+        while node_queue:
+
+            next_coord = node_queue.pop()
+
+            if next_coord in food_coord_set:
+                return next_coord
+
+            x, y  = next_coord
+
+            adj_coords = {
+            (x+1, y), 
+            (x-1,y), 
+            (x, y+1), 
+            (x, y-1)
+            }
+
+            for coord in adj_coords:
+                if self.isValidMove(data, coord) and coord not in seen_set:
+                    seen_set.add(coord)
+                    node_queue.appendleft(coord)
+
+        return None
+
+
+
+
+
 
 if __name__ == "__main__":
     server = Battlesnake()
