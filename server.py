@@ -91,7 +91,7 @@ class Battlesnake(object):
 
         if len(possible_moves) == 0:
             for dir, coord in adjacent_coords:
-                if not self.going_to_headbutt(data, coord, data["you"]["id"]):
+                if self.going_to_headbutt(data, coord, data["you"]["id"]):
                     possible_moves.append(dir)
                 
         return possible_moves
