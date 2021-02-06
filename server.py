@@ -46,7 +46,7 @@ class Battlesnake(object):
         snake_id = data["you"]["id"]
 
         possible_moves = self.get_valid_moves(data)
-
+        print(possible_moves)
 
         move = "up" #Default choice
 
@@ -94,10 +94,15 @@ class Battlesnake(object):
 
         possible_moves = []
         for dir, coord in adjacent_coords:
-            if self.canKill(data, coord):
-                return [(dir, coord)]
-            if self.isValidMove(data, coord):
-                possible_moves.append((dir, coord))
+            # call distance checker to check for valid coords that aren't immediate ded ends.
+            if not self.distance_checker(data, coord):
+                continue
+            if self.isValidMove(data, coord, False):
+                if self.canKill(data, coord):
+                    print("killing")
+                    return [(dir, coord)]
+                if self.isValidMove(data, coord, True):
+                    possible_moves.append((dir, coord))
 
 
         if len(possible_moves) == 0:
@@ -108,24 +113,35 @@ class Battlesnake(object):
         return possible_moves
 
 
-    def isValidMove(self, data, coord):
+    def isValidMove(self, data, coord, count_headbutt):
+        """
+        data: json file from server
+        coord: tuple (x,y) that is being checked.
+        count_headbutt: Boolean -> if True then move is invalid if it leads to a headbutt
+        return: in_bounds, is_empty_space, wont_headbutt. Boolean.
+        """
+        height = data["board"]["height"]
+        width = data["board"]["width"]
 
-            height = data["board"]["height"]
-            width = data["board"]["width"]
+        invalid_coords = set()
+        for snake in data["board"]["snakes"]:
+            snake_body_parts = snake["body"] 
+            for part in snake_body_parts:
+                invalid_coords.add((part["x"],part["y"]))
+                
 
-            invalid_coords = set()
-            for snake in data["board"]["snakes"]:
-                for part in snake["body"]:
-                    invalid_coords.add((part["x"],part["y"]))
+        in_bounds = coord[0] < width and coord[1] < height and coord[0] >= 0 and coord[1] >= 0
+        is_empty_space = coord not in invalid_coords
+
+        our_snake_id = data["you"]["id"]
+        wont_headbutt = not self.going_to_headbutt(data, coord, our_snake_id) if count_headbutt else True
+
+        #if not count_headbutt:
+        #    print(f"invalid coord list: {invalid_coords}")
+        #    print(f"curr coord: {coord}")
 
 
-            in_bounds = coord[0] < width and coord[1] < height and coord[0] >= 0 and coord[1] >= 0
-            is_empty_space = coord not in invalid_coords
-
-            our_snake_id = data["you"]["id"]
-            wont_headbutt = not self.going_to_headbutt(data, coord, our_snake_id)
-
-            return in_bounds and is_empty_space and wont_headbutt
+        return in_bounds and is_empty_space and wont_headbutt 
 
 
     def going_to_headbutt(self, data, coord, our_snake_id):
@@ -141,6 +157,9 @@ class Battlesnake(object):
         other_snake_lst = list(filter(lambda x: x["id"] != our_snake_id, data["board"]["snakes"]))
         other_head_coords = set(map(lambda snake: (snake["head"]["x"], snake["head"]["y"]), other_snake_lst))
 
+        #print(f"these are the adjacent coords: {adjacent_coords}")
+        #print(f"These are the otehr head coords: {other_head_coords}")
+        #print(f"This is their intersection: {adjacent_coords.intersection(other_head_coords)} \n")
         if len(adjacent_coords.intersection(other_head_coords)) == 0:
             return False
 
@@ -192,7 +211,7 @@ class Battlesnake(object):
             }
 
             for coord in adj_coords:
-                if self.isValidMove(data, coord) and coord not in seen_set:
+                if self.isValidMove(data, coord, True) and coord not in seen_set:
                     seen_set.add(coord)
                     node_queue.appendleft(coord)
 
@@ -200,6 +219,11 @@ class Battlesnake(object):
 
     def canKill(self, data, coord):
         
+        #We know we can kill when there is a collision point to move into
+        #i.e. a valid point
+        #AND a snake within one space of the coord we want to move tools
+        #This function will check if there is a head in an adjacent space
+
         our_snake_id = data["you"]["id"]
         
         adjacent_coords = {
@@ -212,14 +236,37 @@ class Battlesnake(object):
         other_snake_lst = list(filter(lambda x: x["id"] != our_snake_id, data["board"]["snakes"]))
         other_head_coords = set(map(lambda snake: (snake["head"]["x"], snake["head"]["y"], snake["length"]), other_snake_lst))
 
+
+
         for x, y, enemy_length in other_head_coords:
-            if (x,y) in adjacent_coords and self.isValidMove(data, (x,y)) and enemy_length < data["you"]["length"]:
+            if (x,y) in adjacent_coords:
+                #print(f"valid move result is: {self.isValidMove(data, (x,y), False)}")
+                print(f"our length vs enemy length: {data['you']['length']} v. {enemy_length}")
+            if (x,y) in adjacent_coords  and enemy_length < data["you"]["length"]:
                 return True
         
         return False
             
 
-        
+    def distance_checker(self, data, dest_coords):
+        adjacent_coords = {
+            ("right", (dest_coords[0]+1, dest_coords[1])), 
+            ("left", ( dest_coords[0]-1, dest_coords[1])), 
+            ("up",( dest_coords[0], dest_coords[1]+1)), 
+            ("down", (dest_coords[0], dest_coords[1]-1))
+        }
+
+        counter = 0
+        for dir, coord in adjacent_coords:
+            if self.isValidMove(data, coord, False):
+                counter += 1
+
+
+        if counter > 0:
+            return True
+        else:
+            return False
+
             
 
 
