@@ -9,7 +9,9 @@ This is a simple Battlesnake server written in Python.
 For instructions see
 https://github.com/BattlesnakeOfficial/starter-snake-python/README.md
 """
-'If killing then it overrides the trapping prevention thingy'
+#If killing then it overrides the trapping prevention thingy
+#handle "one away from being closed" cases
+#If all under 10 then choose largest
 
 class Battlesnake(object):
     @cherrypy.expose
@@ -32,8 +34,9 @@ class Battlesnake(object):
         # This function is called everytime your snake is entered into a game.
         # cherrypy.request.json contains information about the game that's about to be played.
         data = cherrypy.request.json
-        self.length = data["you"]["length"]
-        self.prev_length = 0
+
+        self.curr_tail = (data["you"]["body"][-1]["x"],data["you"]["body"][-1]["y"])
+        self.prev_tail = (-1,-1)
 
         print("START")
         return "ok"
@@ -43,18 +46,20 @@ class Battlesnake(object):
     @cherrypy.tools.json_out()
     def move(self):
 
-
         data = cherrypy.request.json
-        snake_id = data["you"]["id"]
 
+        self.prev_tail = self.curr_tail
+        self.curr_tail = (data["you"]["body"][-1]["x"],data["you"]["body"][-1]["y"])
+
+        print(f"previous tail{self.prev_tail}")
+        print(f"current tail{self.curr_tail}")
         possible_moves = self.get_valid_moves(data)
 
         move = "up" #Default choice
 
         temp_lst = []
         for dir, coord in possible_moves:
-            if self.wont_get_trapped(data, coord):
-                print(f"coord we're deciding on is: {coord}")
+            if self.wont_get_trapped(data, coord, data["you"]["length"]):
                 temp_lst.append((dir, coord))
 
         if len(temp_lst) != 0:
@@ -69,16 +74,12 @@ class Battlesnake(object):
             else:
                 move = random.choice(possible_moves)[0]
 
-        self.prev_length = self.length
-        self.length = data["you"]["length"]
+        
         return {"move": move}
 
     @cherrypy.expose
     @cherrypy.tools.json_in()
     def end(self):
-        # This function is called when a game your snake was in ends.
-        # It's purely for informational purposes, you don't have to make any decisions here.
-        data = cherrypy.request.json
 
         print("END")
         return "ok"
@@ -106,9 +107,7 @@ class Battlesnake(object):
 
         possible_moves = []
         for dir, coord in adjacent_coords:
-            # call distance checker to check for valid coords that aren't immediate ded ends.
-            if not self.distance_checker(data, coord):
-                continue
+
             if self.isValidMove(data, coord, False):
                 if self.canKill(data, coord):
                     print("killing")
@@ -143,7 +142,7 @@ class Battlesnake(object):
             for part in snake_body_parts:
                 invalid_coords.add((part["x"],part["y"]))
                 
-        if tail in invalid_coords and self.prev_length == self.length:
+        if self.prev_tail != self.curr_tail and tail in invalid_coords :
             invalid_coords.remove(tail)
 
         in_bounds = coord[0] < width and coord[1] < height and coord[0] >= 0 and coord[1] >= 0
@@ -171,9 +170,6 @@ class Battlesnake(object):
         other_snake_lst = list(filter(lambda x: x["id"] != our_snake_id, data["board"]["snakes"]))
         other_head_coords = set(map(lambda snake: (snake["head"]["x"], snake["head"]["y"]), other_snake_lst))
 
-        #print(f"these are the adjacent coords: {adjacent_coords}")
-        #print(f"These are the otehr head coords: {other_head_coords}")
-        #print(f"This is their intersection: {adjacent_coords.intersection(other_head_coords)} \n")
         if len(adjacent_coords.intersection(other_head_coords)) == 0:
             return False
 
@@ -232,11 +228,8 @@ class Battlesnake(object):
         return None
 
     def canKill(self, data, coord):
-        
-        #We know we can kill when there is a collision point to move into
-        #i.e. a valid point
-        #AND a snake within one space of the coord we want to move tools
-        #This function will check if there is a head in an adjacent space
+
+        width, height = data["board"]["width"], data["board"]["height"]
 
         our_snake_id = data["you"]["id"]
         
@@ -253,36 +246,19 @@ class Battlesnake(object):
 
 
         for x, y, enemy_length in other_head_coords:
-            if (x,y) in adjacent_coords:
-                #print(f"valid move result is: {self.isValidMove(data, (x,y), False)}")
-                print(f"our length vs enemy length: {data['you']['length']} v. {enemy_length}")
-            if (x,y) in adjacent_coords  and enemy_length < data["you"]["length"]:
+                        
+            if x == 1 or y == 1 or x == width -1 or y == height -1:
+                continue
+            
+            if (x,y) in adjacent_coords  and enemy_length < data["you"]["length"] and self.wont_get_trapped(data, coord, 4):
                 return True
         
         return False
+           
             
+    def wont_get_trapped(self, data, coord, max_node_cnt):
 
-    def distance_checker(self, data, dest_coords):
-
-        adjacent_coords = {
-            (dest_coords[0]+1, dest_coords[1]), 
-             ( dest_coords[0]-1, dest_coords[1]), 
-            (dest_coords[0], dest_coords[1]+1), 
-             (dest_coords[0], dest_coords[1]-1)
-        }
-        
-        counter = 0
-        for coord in adjacent_coords:
-            if self.isValidMove(data, coord, False):
-                counter += 1
-
-
-        return counter > 0
-            
-            
-    def wont_get_trapped(self, data, coord):
-
-        max_node_cnt = 10
+       
 
 
         node_queue = collections.deque([coord])
@@ -302,10 +278,14 @@ class Battlesnake(object):
             }
 
             for coord in adj_coords:
+
                 if self.isValidMove(data, coord, False) and coord not in seen_set:
                     seen_set.add(coord)
                     if len(seen_set) >= max_node_cnt:
                         return True
+
+
+                        
                     node_queue.appendleft(coord)
 
         return False
