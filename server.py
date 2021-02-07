@@ -35,9 +35,6 @@ class Battlesnake(object):
         # cherrypy.request.json contains information about the game that's about to be played.
         data = cherrypy.request.json
 
-        self.curr_tail = (data["you"]["body"][-1]["x"],data["you"]["body"][-1]["y"])
-        self.prev_tail = (-1,-1)
-
         print("START")
         return "ok"
 
@@ -48,11 +45,6 @@ class Battlesnake(object):
 
         data = cherrypy.request.json
 
-        self.prev_tail = self.curr_tail
-        self.curr_tail = (data["you"]["body"][-1]["x"],data["you"]["body"][-1]["y"])
-
-        print(f"previous tail{self.prev_tail}")
-        print(f"current tail{self.curr_tail}")
         possible_moves = self.get_valid_moves(data)
 
         move = "up" #Default choice
@@ -69,7 +61,7 @@ class Battlesnake(object):
         if len(possible_moves) != 0:
             food_coord = self.getNearestFood(data)
 
-            if food_coord:
+            if food_coord and (not self.is_biggest(data) or data["you"]["health"] < 75):
                 move = min(possible_moves, key=lambda p: abs(p[1][0]-food_coord[0])**2 + abs(p[1][1] - food_coord[1])**2)[0]
             else:
                 move = random.choice(possible_moves)[0]
@@ -135,6 +127,7 @@ class Battlesnake(object):
         width = data["board"]["width"]
 
         tail = (data["you"]["body"][-1]["x"],data["you"]["body"][-1]["y"])
+        second_last = (data["you"]["body"][-2]["x"],data["you"]["body"][-2]["y"])
 
         invalid_coords = set()
         for snake in data["board"]["snakes"]:
@@ -142,7 +135,7 @@ class Battlesnake(object):
             for part in snake_body_parts:
                 invalid_coords.add((part["x"],part["y"]))
                 
-        if self.prev_tail != self.curr_tail and tail in invalid_coords :
+        if tail != second_last and tail in invalid_coords :
             invalid_coords.remove(tail)
 
         in_bounds = coord[0] < width and coord[1] < height and coord[0] >= 0 and coord[1] >= 0
@@ -290,6 +283,14 @@ class Battlesnake(object):
 
         return False
 
+    
+    def is_biggest(self, data):
+        for snake in data["board"]["snakes"]:
+            snake_body_parts = snake["body"] 
+            if data["you"]["length"] <= snake["length"] and data["you"]["id"] != snake["id"]:
+                return False
+
+        return True
 
 if __name__ == "__main__":
     server = Battlesnake()
