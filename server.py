@@ -23,7 +23,7 @@ class Battlesnake(object):
         return {
             "apiversion": "1",
             "author": "Chad Snake",
-            "color": "#FFFF00",
+            "color": "#e6e600",
             "head": "gamer",
             "tail": "coffee",
         }
